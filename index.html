@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Rk banking Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #1E40AF; /* Dark blue */
+      --secondary: #2563EB; /* Blue */
+      --bg: #F3F4F6; /* Light gray */
+      --card-bg: #FFFFFF; /* White */
+      --text-dark: #111827;
+      --text-light: #6B7280;
+      --success: #16A34A;
+      --danger: #DC2626;
+      --accent: #F59E0B;
+    }
+
+    body { font-family: Arial, sans-serif; background: var(--bg); margin:0; padding:0; color: var(--text-dark); }
+
+    header {
+      background: var(--primary); color:white; padding:15px 20px;
+      display:flex; justify-content:space-between; align-items:center;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    header h1 { margin:0; font-size:1.5em; }
+
+    .container { max-width:1200px; margin:auto; padding:20px; }
+
+    .card {
+      background: var(--card-bg); padding:20px;
+      border-radius:10px; margin-bottom:20px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    input, select { padding:8px; margin:5px 0; width:100%; border:1px solid #D1D5DB; border-radius:5px; font-size:0.95em; }
+
+    button { padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
+
+    .btn-primary { background: var(--secondary); color:white; }
+    .btn-danger { background: var(--danger); color:white; }
+    .btn-success { background: var(--success); color:white; }
+
+    .flex { display:flex; gap:10px; flex-wrap:wrap; }
+
+    .notification { background:#E5E7EB; padding:6px 10px; margin:3px 0; border-radius:5px; font-size:0.9em; }
+
+    h2 { color: var(--primary); margin-bottom:10px; }
+
+    /* Login page styling */
+    #loginPage { display:flex; align-items:center; justify-content:center; height:100vh; }
+    #loginPage .card { max-width:400px; width:100%; text-align:center; }
+  </style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div id="loginPage">
+  <div class="card">
+    <h2>Rk banking Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <select id="userRole">
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+    </select>
+    <button class="btn-primary" onclick="login()">Login</button>
+  </div>
+</div>
+
+<!-- Main Container -->
+<div id="mainContainer" class="container" style="display:none;">
+
+  <header>
+    <h1>Rk banking Dashboard</h1>
+    <div>
+      <select id="roleSelect">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- User Dashboard -->
+  <div id="userDashboard">
+    <div class="card">
+      <h2>Accounts</h2>
+      <ul id="accountList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Apply Loan</h2>
+      <input type="number" id="loanAmount" placeholder="Loan Amount">
+      <select id="loanTerm">
+        <option value="12">12 Months</option>
+        <option value="24">24 Months</option>
+        <option value="36">36 Months</option>
+      </select>
+      <button class="btn-primary" onclick="applyLoan()">Apply Loan</button>
+    </div>
+
+    <div class="card">
+      <h2>Pay Bill</h2>
+      <input type="text" id="billType" placeholder="Bill Type">
+      <input type="number" id="billAmount" placeholder="Amount">
+      <button class="btn-primary" onclick="payBill()">Pay Bill</button>
+    </div>
+
+    <div class="card">
+      <h2>Spending Analytics</h2>
+      <canvas id="spendingChart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Notifications</h2>
+      <div id="notifications"></div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="adminDashboard" style="display:none;">
+    <div class="card">
+      <h2>Loan Requests</h2>
+      <ul id="loanRequests"></ul>
+      <button class="btn-danger" onclick="undoLast()">Undo Last Action</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentUser = null;
+  let accounts = [{id:'acc1', name:'Savings', balance:50000}];
+  let loans = [];
+  let bills = [];
+  let notifications = [];
+  let commandHistory = [];
+
+  // Login
+  function login() {
+    const username = document.getElementById('username').value.trim();
+    const role = document.getElementById('userRole').value;
+    if(!username) return alert('Enter username');
+    currentUser = {name:username, role};
+    document.getElementById('loginPage').style.display='none';
+    document.getElementById('mainContainer').style.display='block';
+    document.getElementById('roleSelect').value=role;
+    toggleDashboard();
+    renderAccounts();
+    renderLoanRequests();
+    renderChart();
+    notify(`Welcome ${username} (${role})`);
+  }
+
+  // Toggle dashboards
+  document.getElementById('roleSelect').addEventListener('change', e=>{
+    toggleDashboard();
+  });
+
+  function toggleDashboard(){
+    const role = document.getElementById('roleSelect').value;
+    document.getElementById('userDashboard').style.display = role==='user'?'block':'none';
+    document.getElementById('adminDashboard').style.display = role==='admin'?'block':'none';
+  }
+
+  function renderAccounts() {
+    const ul = document.getElementById('accountList');
+    ul.innerHTML = '';
+    accounts.forEach(a => {
+      const li = document.createElement('li');
+      li.textContent = `${a.name}: ₹${a.balance}`;
+      ul.appendChild(li);
+    });
+  }
+
+  function notify(msg) {
+    notifications.unshift(msg);
+    if(notifications.length>10) notifications.pop();
+    const div = document.getElementById('notifications');
+    div.innerHTML = '';
+    notifications.forEach(n => {
+      const el = document.createElement('div');
+      el.className='notification';
+      el.textContent = n;
+      div.appendChild(el);
+    });
+  }
+
+  function applyLoan() {
+    const amt = Number(document.getElementById('loanAmount').value);
+    const term = Number(document.getElementById('loanTerm').value);
+    if(!amt || !term) return alert('Enter valid loan');
+    const loan = {id:Date.now(), amount:amt, term:term, status:'Pending'};
+    loans.push(loan);
+    notify(`Loan applied: ₹${amt}`);
+    renderLoanRequests();
+  }
+
+  function approveLoan(id) {
+    const loan = loans.find(l=>l.id===id);
+    if(!loan) return;
+    const prevStatus = loan.status;
+    loan.status = 'Approved';
+    commandHistory.push({loan, prevStatus});
+    notify(`Loan ${id} Approved`);
+    renderLoanRequests();
+  }
+
+  function rejectLoan(id) {
+    const loan = loans.find(l=>l.id===id);
+    if(!loan) return;
+    const prevStatus = loan.status;
+    loan.status = 'Rejected';
+    commandHistory.push({loan, prevStatus});
+    notify(`Loan ${id} Rejected`);
+    renderLoanRequests();
+  }
+
+  function undoLast() {
+    const last = commandHistory.pop();
+    if(!last) return;
+    last.loan.status = last.prevStatus;
+    notify(`Undo: Loan ${last.loan.id} reverted to ${last.prevStatus}`);
+    renderLoanRequests();
+  }
+
+  function renderLoanRequests() {
+    const ul = document.getElementById('loanRequests');
+    ul.innerHTML = '';
+    loans.forEach(l => {
+      const li = document.createElement('li');
+      li.textContent = `ID:${l.id} Amount:₹${l.amount} Status:${l.status} `;
+      const approveBtn = document.createElement('button');
+      approveBtn.textContent='Approve'; approveBtn.className='btn-primary'; approveBtn.onclick=()=>approveLoan(l.id);
+      const rejectBtn = document.createElement('button');
+      rejectBtn.textContent='Reject'; rejectBtn.className='btn-danger'; rejectBtn.onclick=()=>rejectLoan(l.id);
+      li.appendChild(approveBtn);
+      li.appendChild(rejectBtn);
+      ul.appendChild(li);
+    });
+  }
+
+  function payBill() {
+    const type = document.getElementById('billType').value;
+    const amt = Number(document.getElementById('billAmount').value);
+    if(!type || !amt) return alert('Enter valid bill info');
+    bills.push({type, amt, date:new Date().toLocaleDateString()});
+    notify(`Bill Paid: ${type} ₹${amt}`);
+  }
+
+  function renderChart() {
+    const ctx = document.getElementById('spendingChart').getContext('2d');
+    const data = {
+      labels: ['Food','Transport','Bills'],
+      datasets: [{
+        label:'Spending',
+        data: [2500,800,1200],
+        backgroundColor:['#2563EB','#1E40AF','#F59E0B']
+      }]
+    };
+    new Chart(ctx,{type:'pie',data});
+  }
+</script>
+
+</body>
+</html>
